@@ -62,7 +62,7 @@ class Ipmi(Obm):
 
         if status != 0:
             logger = logging.getLogger(__name__)
-            logger.info('Nonzero exit status form ipmitool, args = %r', args)
+            logger.info('Nonzero exit status from ipmitool, args = %r', args)
         return status
 
     @no_dry_run
@@ -93,32 +93,72 @@ class Ipmi(Obm):
         # to prevent stdout from becoming garbled.  This happens because
         # ipmitool sets shell settings to behave like a tty when communicateing
         # over Serial over Lan
-        Popen(
-            ['ipmitool',
-            '-H', self.host,
-            '-U', self.user,
-            '-P', self.password,
-            '-I', 'lanplus',
-            'sol', 'activate'],
-            stdin=PIPE,
-            stdout=open(self.get_console_log_filename(), 'a'),
-            stderr=PIPE)
+        try:
+            proc = Popen(
+                        ['ipmitool',
+                        '-H', self.host,
+                        '-U', self.user,
+                        '-P', self.password,
+                        '-I', 'lanplus',
+                        'sol', 'activate'],
+                        stdin=PIPE,
+                        stdout=open(self.get_console_log_filename(), 'a'),
+                        stderr=PIPE)
 
-    # stdin, stdout, and stderr are redirected to a pipe that is never read
-    # because we are not interested in the ouput of this command.
+            ouput, error = proc.communicate()
+            if error:
+                logger = logging.getLogger(__name__)
+                logger.error('Error in ipmitool start_console: %s', error.strip())
+                raise OBMError('Could not start console on node %s' % self.node.label)
+
+        except OSError as e:
+            logger = logging.getLogger(__name__)
+            logger.error('OSError in ipmitool start_console: %s', e.strerror)
+            raise OBMError('Could not start console on node %s' % self.node.label)
+        except:
+            logger = logging.getLogger(__name__)
+            logger.error('Error in ipmitool start_console: %s', sys.exc_info()[0])
+            raise OBMError('Could not start console on node %s' % self.node.label)
+
+
     @no_dry_run
     def stop_console(self):
-        call(['pkill', '-f', 'ipmitool -H %s' %self.host])
-        proc = Popen(
-            ['ipmitool',
-            '-H', self.host,
-            '-U', self.user,
-            '-P', self.password,
-            '-I', 'lanplus',
-            'sol', 'deactivate'],
-            stdin=PIPE,
-            stdout=PIPE,
-            stderr=PIPE)
+        # stdin, stdout, and stderr are redirected to a pipe that is never read
+        # because we are not interested in the ouput of this command.
+
+        status = call(['pkill', '-f', 'ipmitool -H %s' %self.host])
+
+        if status != 0:
+            logger = logging.getLogger(__name__)
+            logger.info('Nonzero exit status from ipmitool stop_console on node %s' % self.node.label)
+            return status
+
+        try:
+            proc = Popen(
+                        ['ipmitool',
+                        '-H', self.host,
+                        '-U', self.user,
+                        '-P', self.password,
+                        '-I', 'lanplus',
+                        'sol', 'deactivate'],
+                        stdin=PIPE,
+                        stdout=PIPE,
+                        stderr=PIPE)
+
+            ouput, error = proc.communicate()
+            if error:
+                logger = logging.getLogger(__name__)
+                logger.error('Error in ipmitool start_console: %s', error.strip())
+                raise OBMError('Could not start console on node %s' % self.node.label)
+
+        except OSError as e:
+            logger = logging.getLogger(__name__)
+            logger.error('OSError in ipmitool start_console: %s', e.strerror)
+            raise OBMError('Could not start console on node %s' % self.node.label)
+        except:
+            logger = logging.getLogger(__name__)
+            logger.error('Error in ipmitool start_console: %s', sys.exc_info()[0])
+            raise OBMError('Could not start console on node %s' % self.node.label)
         proc.wait()
 
     def delete_console(self):
