@@ -18,6 +18,8 @@ from haas import model
 from haas.model import db
 import logging
 
+logger = logging.getLogger(__name__)
+
 
 def apply_networking():
     """Do each networking action in the journal, then cross them off.
@@ -49,32 +51,30 @@ def apply_networking():
 
     for action in actions:
         nic = action.nic
-        network = action.new_network
+
         if nic.port:
             switch = nic.port.owner
             if switch.label not in switch_sessions:
                 switch_sessions[switch.label] = switch.session()
             switch_sessions[switch.label].apply_networking(action)
         else:
-            logging.getLogger(__name__).warn(
-                'Not modifying NIC %s; NIC is not on a port.' %
-                nic.label)
+            logger.warn('Not modifying NIC %s; NIC is not on a port.' %
+                        nic.label)
 
-    # Close all of our sessions:
-    for session in switch_sessions.values():
-        session.disconnect()
-
-    # Then perform the database changes and delete them
-    for action in actions:
+        # Then perform the database changes and delete them
         if action.new_network is None:
             model.NetworkAttachment.query \
-                .filter_by(nic=action.nic, channel=action.channel)\
+                .filter_by(nic=action.nic, channel=action.channel) \
                 .delete()
         else:
             db.session.add(model.NetworkAttachment(nic=action.nic,
                                                    network=action.new_network,
                                                    channel=action.channel))
         db.session.delete(action)
+        db.session.commit()
 
-    db.session.commit()
+    # Close all of our sessions:
+    for session in switch_sessions.values():
+        session.disconnect()
+
     return True
