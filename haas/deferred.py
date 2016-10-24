@@ -20,6 +20,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 def apply_networking():
     """Do each networking action in the journal, then cross them off.
 
@@ -50,7 +51,7 @@ def apply_networking():
 
     for action in actions:
         nic = action.nic
-        network = action.new_network
+
         if nic.port:
             switch = nic.port.owner
             if switch.label not in switch_sessions:
@@ -59,7 +60,7 @@ def apply_networking():
         else:
             logger.warn('Not modifying NIC %s; NIC is not on a port.' %
                         nic.label)
-        
+
         # Then perform the database changes and delete them
         if action.new_network is None:
             model.NetworkAttachment.query \
