@@ -74,18 +74,22 @@ class _Session(_console.Session):
     @staticmethod
     def connect(switch):
         # connect to the switch, and log in:
-        console = pexpect.spawn('telnet ' + switch.hostname)
-        console.expect('User Name:')
-        console.sendline(switch.username)
-        console.expect('Password:')
-        console.sendline(switch.password)
+        try:
+            console = pexpect.spawn('telnet ' + switch.hostname)
+            console.expect('User Name:')
+            console.sendline(switch.username)
+            console.expect('Password:')
+            console.sendline(switch.password)
+            logger.debug('Logged in to switch %r', switch)
 
-        logger.debug('Logged in to switch %r', switch)
+            prompts = _console.get_prompts(console)
 
-        prompts = _console.get_prompts(console)
-        return _Session(switch=switch,
-                        console=console,
-                        **prompts)
+            return _Session(switch=switch,
+                            console=console,
+                            **prompts)
+        except pexpect.TIMEOUT as e:
+            logger.warn('Timeout on switch %r, could not connect', self.switch)
+            logger.debug(e.get_trace())
 
     def enter_if_prompt(self, interface):
         self._sendline('config')
@@ -114,8 +118,13 @@ class _Session(_console.Session):
 
     def disconnect(self):
         self._sendline('exit')
-        self.console.expect(pexpect.EOF)
-        logger.debug('Logged out of switch %r', self.switch)
+        try:
+            self.console.expect(pexpect.EOF)
+            logger.debug('Logged out of switch %r', self.switch)
+        except pexpect.TIMEOUT as e:
+            logger.warn('Timeout on switch: %r, could not disconnect',
+                        self.switch)
+            logger.debug(e.get_trace())
 
     def get_port_networks(self, ports):
         num_re = re.compile(r'(\d+)')
@@ -166,27 +175,44 @@ class _Session(_console.Session):
                       'Quit: q or CTRL+Z, One line: <return> '),
             r'Classification rules:\r\n',  # End
             r'[^ \t\r\n][^:]*:[^\n]*\n',   # Key:Value\r\n,
-            r' [^\n]*\n',                  # continuation line (from k:v)
+            r' [^\n]*\n',  # continuation line (from k:v)
         ]
         self._sendline('show int sw %s' % interface)
         # Find the first Key:Value pair (this is needed to skip past some
         # possible matches for other patterns prior to this:
-        self.console.expect(alternatives[2])
-
-        k, v = self.console.after.split(':', 1)
-        result = {k: v}
+        try:
+            self.console.expect(alternatives[2])
+            k, v = self.console.after.split(':', 1)
+            result = {k: v}
+        except pexpect.TIMEOUT as e:
+            logger.warn('Timeout on switch: %r', self.switch)
+            logger.debug(e.get_trace())
+            return
 
         while True:
-            index = self.console.expect(alternatives)
-            if index == 0:
-                self.console.send(' ')
-            elif index == 1:
-                break
-            elif index == 2:
-                k, v = self.console.after.split(':', 1)
-                result[k] = v
-            elif index == 3:
-                result[k] += self.console.after
+            try:
+                index = self.console.expect(alternatives)
 
-        self.console.expect(self.main_prompt)
+                if index == 0:
+                    self.console.send(' ')
+                elif index == 1:
+                    break
+                elif index == 2:
+                    k, v = self.console.after.split(':', 1)
+                    result[k] = v
+                elif index == 3:
+                    result[k] += self.console.after
+
+            except pexpect.TIMEOUT as e:
+                logger.warn('Timeout on switch: %r', self.switch)
+                logger.debug(e.get_trace())
+                return
+
+        try:
+            self.console.expect(self.main_prompt)
+        except pexpect.TIMEOUT as e:
+            logger.warn('Timeout on switch: %r', self.switch)
+            logger.debug(e.get_trace())
+            return
+
         return result

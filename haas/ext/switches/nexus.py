@@ -99,24 +99,29 @@ class _Session(_console.Session):
 
     @staticmethod
     def connect(switch):
-        console = pexpect.spawn('telnet ' + switch.hostname)
-        console.expect('login: ')
-        console.sendline(switch.username)
-        console.expect('Password: ')
-        console.sendline(switch.password)
+        try:
+            console = pexpect.spawn('telnet ' + switch.hostname)
+            console.expect('login: ')
+            console.sendline(switch.username)
+            console.expect('Password: ')
+            console.sendline(switch.password)
 
-        console = pexpect.spawn('telnet ' + switch.hostname)
-        console.expect('login: ')
-        console.sendline(switch.username)
-        console.expect('Password: ')
-        console.sendline(switch.password)
+            console = pexpect.spawn('telnet ' + switch.hostname)
+            console.expect('login: ')
+            console.sendline(switch.username)
+            console.expect('Password: ')
+            console.sendline(switch.password)
 
-        prompts = _console.get_prompts(console)
+            prompts = _console.get_prompts(console)
 
-        return _Session(console=console,
-                        dummy_vlan=switch.dummy_vlan,
-                        switch=switch,
-                        **prompts)
+            return _Session(console=console,
+                            dummy_vlan=switch.dummy_vlan,
+                            switch=switch,
+                            **prompts)
+        except pexpect.TIMEOUT as e:
+            logger.warn('Timeout on switch: %r, could not connect', switch)
+            logger.debug(e.get_trace())
+            return
 
     def _port_configs(self, ports):
         alternatives = [
@@ -135,18 +140,24 @@ class _Session(_console.Session):
         info = {interface: {}}
 
         while True:
-            index = self.console.expect(alternatives)
-            if index == 0:
-                self.console.send(' ')
-            elif index == 1:
-                _, interface = self.console.after.split(':', 1)
-                interface = interface.strip()
-                info[interface] = {}
-            elif index == 2:
-                k, v = self.console.after.split(':', 1)
-                info[interface][k.strip()] = v.strip()
-            elif index == 3:
-                break
+            try:
+                index = self.console.expect(alternatives)
+                if index == 0:
+                    self.console.send(' ')
+                elif index == 1:
+                    _, interface = self.console.after.split(':', 1)
+                    interface = interface.strip()
+                    info[interface] = {}
+                elif index == 2:
+                    k, v = self.console.after.split(':', 1)
+                    info[interface][k.strip()] = v.strip()
+                elif index == 3:
+                    break
+
+            except pexpect.TIMEOUT as e:
+                logger.warn('Timeout on switch: %r', self.switch)
+                logger.debug(e.get_trace())
+                return
 
         # The output of show int sw calls things "EthernetX/YY", but
         # everything else calls things "ethernet X/YY". Let's do the conversion

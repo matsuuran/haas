@@ -15,8 +15,10 @@
 
 from abc import ABCMeta, abstractmethod
 import re
+import pexpect
+import logging
 
-
+logger = logging.getLogger(__name__)
 _CHANNEL_RE = re.compile(r'vlan/(\d+)')
 
 
@@ -73,7 +75,13 @@ class Session(object):
         channel = action.channel
 
         self.enter_if_prompt(interface)
-        self.console.expect(self.if_prompt)
+
+        try:
+            self.console.expect(self.if_prompt)
+        except pexpect.TIMEOUT as e:
+            logger.warn('Networking Action could not be applied to switch.')
+            logger.debug(e.get_trace())
+            return
 
         if channel == 'vlan/native':
             old_native = None
@@ -101,7 +109,12 @@ class Session(object):
                 self.enable_vlan(vlan_id)
 
         self.exit_if_prompt()
-        self.console.expect(self.config_prompt)
+        try:
+            self.console.expect(self.config_prompt)
+        except pexpect.TIMEOUT as e:
+            logger.warn('Networking Action could not be applied to switch.')
+            logger.debug(e.get_trace())
+            return
 
 
 def get_prompts(console):
@@ -109,7 +122,13 @@ def get_prompts(console):
         # [\r\n]+ will handle any newline
         # .+ will handle any character after newline
         # this sequence terminates with #
-        console.expect(r'[\r\n]+.+#')
+        try:
+            console.expect(r'[\r\n]+.+#')
+        except pexpect.TIMEOUT as e:
+            logger.warn('Timeout on switch could not get prompts')
+            logger.debug(e.get_trace())
+            return
+
         cmd_prompt = console.after.split('\n')[-1]
         cmd_prompt = cmd_prompt.strip(' \r\n\t')
 

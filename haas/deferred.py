@@ -17,6 +17,9 @@
 from haas import model
 from haas.model import db
 import logging
+import pexpect
+
+logger = logging.getLogger(__name__)
 
 
 def apply_networking():
@@ -55,13 +58,14 @@ def apply_networking():
             if switch.label not in switch_sessions:
                 switch_sessions[switch.label] = switch.session()
             switch_sessions[switch.label].apply_networking(action)
+
         else:
-            logging.getLogger(__name__).warn(
-                'Not modifying NIC %s; NIC is not on a port.' %
-                nic.label)
+            logger.warn('Not modifying NIC %s; NIC is not on a port.'
+                        % nic.label)
 
     # Close all of our sessions:
     for session in switch_sessions.values():
+        logger.debug(session)
         session.disconnect()
 
     # Then perform the database changes and delete them
