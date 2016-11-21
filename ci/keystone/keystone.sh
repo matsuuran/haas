@@ -45,7 +45,7 @@ case "$1" in
     # too old to parse some of the syntax used in keystone's requirements.txt.
     # Make sure we have the latest:
     pip install --upgrade pip
-
+    
     pip install -r requirements.txt
     pip install .
     pip install uwsgi # To actually run keystone; no webserver in the deps.
