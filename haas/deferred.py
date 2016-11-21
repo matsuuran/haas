@@ -61,7 +61,7 @@ def apply_networking():
             logger.warn('Not modifying NIC %s; NIC is not on a port.' %
                         nic.label)
 
-        # Then perform the database changes and delete them
+        # Perform the database changes and delete them
         if action.new_network is None:
             model.NetworkAttachment.query \
                 .filter_by(nic=action.nic, channel=action.channel) \
