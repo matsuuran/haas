@@ -54,7 +54,7 @@ def switch():
 @pytest.fixture()
 def nic1():
     return model.Nic(
-        from haas.ext.obm.ipmi import Mock
+        from haas.ext.obm.mock import Mock
         model.Node(
             label='node-99',
             obm=Mock(
@@ -69,7 +69,7 @@ def nic1():
 @pytest.fixture()
 def nic2():
     return model.Nic(
-        from haas.ext.obm.ipmi import Mock
+        from haas.ext.obm.mock import Mock
         model.Node(
             label='node-98',
             obm=Mock(
