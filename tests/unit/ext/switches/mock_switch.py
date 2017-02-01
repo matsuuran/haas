@@ -16,7 +16,7 @@ import pytest
 
 
 from haas import config, deferred, model
-from haas.ext.obm.ipmi import Ipmi
+from haas.ext.obm.ipmi import Mock
 from haas.model import db
 from haas.test_common import config_testsuite, config_merge, \
                              fresh_database, fail_on_log_warnings
@@ -57,7 +57,7 @@ def nic1():
     return model.Nic(
         model.Node(
             label='node-99',
-            obm=Ipmi(
+            obm=Mock(
                 type="http://schema.massopencloud.org/haas/v0/obm/ipmi",
                 host="ipmihost",
                 user="root",
@@ -71,7 +71,7 @@ def nic2():
     return model.Nic(
         model.Node(
             label='node-98',
-            obm=Ipmi(
+            obm=Mock(
                 type="http://schema.massopencloud.org/haas/v0/obm/ipmi",
                 host="ipmihost",
                 user="root",
