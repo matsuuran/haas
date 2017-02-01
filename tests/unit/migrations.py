@@ -16,7 +16,7 @@ The general approach is as follows:
 
 """
 import pytest
-from haas import server
+from haas import api, server
 from haas.test_common import config_testsuite, config_merge, initial_db, \
     fail_on_log_warnings
 from haas.config import cfg, load_extensions
@@ -28,6 +28,44 @@ from os import path
 import re
 from pprint import pformat
 import difflib
+
+MOCK_SWITCH_TYPE = 'http://schema.massopencloud.org/haas/v0/switches/mock'
+MOCK_OBM_TYPE = 'http://schema.massopencloud.org/haas/v0/obm/mock'
+
+
+def create_pending_actions_db():
+    """Create database objects including a pending NetworkingAction.
+
+    The first version of this function was used to create the dump
+    'pending-networking-actions.sql'.
+    """
+    # At a minimum we need a project, node, nic, switch, port, and network:
+    api.project_create('runway')
+    api.node_register(
+        'node-1',
+        obm={
+            'type': MOCK_OBM_TYPE,
+            'user': 'user',
+            'host': 'host',
+            'password': 'pass',
+        },
+    )
+    api.node_register_nic('node-1', 'pxe', 'de:ad:be:ef:20:16')
+    api.switch_register('sw0',
+                        type=MOCK_SWITCH_TYPE,
+                        username='user',
+                        hostname='host',
+                        password='pass',
+                        )
+    api.switch_register_port('sw0', 'gi1/0/4')
+    api.port_connect_nic('sw0', 'gi1/0/4', 'node-1', 'pxe')
+    api.project_connect_node('runway', 'node-1')
+    api.network_create('runway_pxe', 'runway', 'runway', '')
+
+    # Queue up a networking action. Importantly, we do *not* call
+    # deferred.apply_networking, as that would flush the action and
+    # remove it from the database.
+    api.node_connect_network('node-1', 'pxe', 'runway_pxe')
 
 fail_on_log_warnings = pytest.fixture(autouse=True)(fail_on_log_warnings)
 
@@ -87,14 +125,14 @@ def load_dump(filename):
     upgrade(revision='heads')
 
 
-def fresh_create():
+def fresh_create(make_objects):
     """Create a fresh database, and populate it with an initial set of objects.
 
-    The objects are created via `initial_db`. These objects should be such that
-    a migrated database dump will have the same contents.
+    The objects are created via `make_objects`. These objects should be such
+    that a migrated database dump will have the same contents.
     """
     create_db()
-    initial_db()
+    make_objects()
 
 
 def get_db_state():
@@ -123,8 +161,8 @@ def get_db_state():
     return result
 
 
-@pytest.mark.parametrize('filename,extra_config', [
-    ['flask.sql', {
+@pytest.mark.parametrize('filename,make_objects,extra_config', [
+    ['flask.sql', initial_db, {
         'extensions': {
             'haas.ext.switches.mock': '',
             'haas.ext.switches.nexus': '',
@@ -142,9 +180,34 @@ def get_db_state():
             'vlans': '100-200, 300-500',
         },
     }],
+    ['pending-networking-actions.sql', create_pending_actions_db, {
+        'extensions': {
+            'haas.ext.obm.mock': '',
+            'haas.ext.switches.mock': '',
+            'haas.ext.auth.null': '',
+            'haas.ext.network_allocators.null': '',
+        },
+    }],
 ])
-def test_db_eq(filename, extra_config):
-    """Verify that each function in fns creates the same database."""
+def test_db_eq(filename, make_objects, extra_config):
+    """Migrating from a snapshot should create the same objects as a new db.
+
+    `make_objects` is a function that, when run against the latest version
+        of a schema, will create some set of objects.
+    `filename` is the name of an sql dump of a previous database, whose
+        contents were created with the then-current version of `make_objects`.
+    `extra_config` specifies modifications to the haas.cfg under which the
+        test is run. this is passed to `config_merge`.
+
+    The test does the following:
+
+        * Restore the database snapshot and run the migration scripts to update
+          its contents to the current schema.
+        * Create a fresh database according to the current schema, and execute
+          `make_objects`.
+        * Compare the two resulting databases. The test passes if and only if
+          they are the same.
+    """
 
     config_merge(extra_config)
     load_extensions()
@@ -164,7 +227,7 @@ def test_db_eq(filename, extra_config):
         return get_db_state()
 
     upgraded = run_fn(lambda: load_dump(filename))
-    fresh = run_fn(fresh_create)
+    fresh = run_fn(lambda: fresh_create(make_objects))
     drop_tables()
 
     def censor_nondeterminism(string):
