@@ -16,7 +16,6 @@ import pytest
 
 
 from haas import config, deferred, model
-from haas.ext.obm.ipmi import Mock
 from haas.model import db
 from haas.test_common import config_testsuite, config_merge, \
                              fresh_database, fail_on_log_warnings
@@ -55,6 +54,7 @@ def switch():
 @pytest.fixture()
 def nic1():
     return model.Nic(
+        from haas.ext.obm.ipmi import Mock
         model.Node(
             label='node-99',
             obm=Mock(
@@ -69,6 +69,7 @@ def nic1():
 @pytest.fixture()
 def nic2():
     return model.Nic(
+        from haas.ext.obm.ipmi import Mock
         model.Node(
             label='node-98',
             obm=Mock(
