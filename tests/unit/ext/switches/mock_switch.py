@@ -29,88 +29,91 @@ INTERFACE1 = '104/0/10'
 INTERFACE2 = '104/0/18'
 
 
-class TestMockSwitch:
+@pytest.fixture
+def configure():
+    config_testsuite()
+    config_merge({
+        'extensions': {
+            'haas.ext.auth.mock': '',
+            'haas.ext.auth.null': None,
+        },
+    })
+    config.load_extensions()
 
-    @pytest.fixture
-    def configure():
-        config_testsuite()
-        config_merge({
-            'extensions': {
-                'haas.ext.auth.mock': '',
-                'haas.ext.auth.null': None,
-            },
-        })
-        config.load_extensions()
 
-    @pytest.fixture()
-    def switch():
-        return MockTestSwitch(
-            label='switch',
-            hostname='http://example.com',
-            username='admin',
-            password='admin',
-        ).session()
+@pytest.fixture()
+def switch():
+    return MockTestSwitch(
+        label='switch',
+        hostname='http://example.com',
+        username='admin',
+        password='admin',
+    ).session()
 
-    @pytest.fixture()
-    def nic1():
-        from haas.ext.obm.mock import MockObm
-        return model.Nic(
-            model.Node(
-                label='node-99',
-                obm=Mock(
-                    type="http://schema.massopencloud.org/haas/v0/obm/ipmi",
-                    host="ipmihost",
-                    user="root",
-                    password="tapeworm")),
-            'ipmi',
-            '00:11:22:33:44:55')
 
-    @pytest.fixture()
-    def nic2():
-        from haas.ext.obm.mock import MockObm
-        return model.Nic(
-            model.Node(
-                label='node-98',
-                obm=Mock(
-                    type="http://schema.massopencloud.org/haas/v0/obm/ipmi",
-                    host="ipmihost",
-                    user="root",
-                    password="tapeworm")),
-            'ipmi',
-            '00:11:22:33:44:55')
+@pytest.fixture()
+def nic1():
+    from haas.ext.obm.mock import MockObm
+    return model.Nic(
+        model.Node(
+            label='node-99',
+            obm=MockObm(
+                type="http://schema.massopencloud.org/haas/v0/obm/ipmi",
+                host="ipmihost",
+                user="root",
+                password="tapeworm")),
+        'ipmi',
+        '00:11:22:33:44:55')
 
-    @pytest.fixture
-    def network():
-        project = model.Project('anvil-nextgen')
-        return model.Network(project, [project], True, '102', 'hammernet')
 
-    pytestmark = pytest.mark.usefixtures('configure',
-                                         'fresh_database')
+@pytest.fixture()
+def nic2():
+    from haas.ext.obm.mock import MockObm
+    return model.Nic(
+        model.Node(
+            label='node-98',
+            obm=MockObm(
+                type="http://schema.massopencloud.org/haas/v0/obm/ipmi",
+                host="ipmihost",
+                user="root",
+                password="tapeworm")),
+        'ipmi',
+        '00:11:22:33:44:55')
 
-    def test_apply_networking(switch, nic1, nic2, network):
-        # Create a port on the switch and connect it to the nic
-        port = model.Port(label=INTERFACE1, switch=switch)
-        nic1.port = port
 
-        port = model.Port(label=INTERFACE2, switch=switch)
-        nic2.port = port
+@pytest.fixture()
+def network():
+    project = model.Project('anvil-nextgen')
+    return model.Network(project, [project], True, '102', 'hammernet')
 
-        # Test action to set a network as native
-        action_native1 = model.NetworkingAction(nic=nic1,
-                                                new_network=network,
-                                                channel='vlan/native')
-        action_native2 = model.NetworkingAction(nic=nic2,
-                                                new_network=network,
-                                                channel='vlan/native')
+pytestmark = pytest.mark.usefixtures('configure',
+                                     'fresh_database')
 
-        db.session.add(action_native1)
-        db.session.add(action_native2)
-        db.session.commit()
 
-        current_count = db.session.query(model.NetworkingAction).count()
-        last_count = current_count
+def test_apply_networking(switch, nic1, nic2, network):
+    # Create a port on the switch and connect it to the nic
+    port = model.Port(label=INTERFACE1, switch=switch)
+    nic1.port = port
 
-        deferred.apply_networking()
+    port = model.Port(label=INTERFACE2, switch=switch)
+    nic2.port = port
+
+    # Test action to set a network as native
+    action_native1 = model.NetworkingAction(nic=nic1,
+                                            new_network=network,
+                                            channel='vlan/native')
+    action_native2 = model.NetworkingAction(nic=nic2,
+                                            new_network=network,
+                                            channel='vlan/native')
+
+    db.session.add(action_native1)
+    db.session.add(action_native2)
+    db.session.commit()
+
+    current_count = db.session.query(model.NetworkingAction).count()
+    last_count = current_count
+
+    deferred.apply_networking()
 
 
 class MockTestSwitch(model.Switch):
