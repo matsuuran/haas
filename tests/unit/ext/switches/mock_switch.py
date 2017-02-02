@@ -53,8 +53,8 @@ class TestMockSwitch:
 
     @pytest.fixture()
     def nic1():
+        from haas.ext.obm.mock import MockObm
         return model.Nic(
-            from haas.ext.obm.mock import MockObm
             model.Node(
                 label='node-99',
                 obm=Mock(
@@ -67,8 +67,8 @@ class TestMockSwitch:
 
     @pytest.fixture()
     def nic2():
+        from haas.ext.obm.mock import MockObm
         return model.Nic(
-            from haas.ext.obm.mock import MockObm
             model.Node(
                 label='node-98',
                 obm=Mock(
