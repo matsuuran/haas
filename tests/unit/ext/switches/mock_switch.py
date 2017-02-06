@@ -15,7 +15,7 @@
 import pytest
 
 
-from haas import config, deferred, model
+from haas import api, config, deferred, model
 from haas.model import db
 from haas.test_common import config_testsuite, config_merge, \
                              fresh_database, fail_on_log_warnings
@@ -36,6 +36,7 @@ def configure():
         'extensions': {
             'haas.ext.auth.mock': '',
             'haas.ext.auth.null': None,
+            'haas.ext.obm.mock': '',
         },
     })
     config.load_extensions()
@@ -58,7 +59,7 @@ def nic1():
         model.Node(
             label='node-99',
             obm=MockObm(
-                type="http://schema.massopencloud.org/haas/v0/obm/ipmi",
+                type="http://schema.massopencloud.org/haas/v0/obm/mock",
                 host="ipmihost",
                 user="root",
                 password="tapeworm")),
@@ -73,7 +74,7 @@ def nic2():
         model.Node(
             label='node-98',
             obm=MockObm(
-                type="http://schema.massopencloud.org/haas/v0/obm/ipmi",
+                type="http://schema.massopencloud.org/haas/v0/obm/mock",
                 host="ipmihost",
                 user="root",
                 password="tapeworm")),
@@ -91,6 +92,7 @@ pytestmark = pytest.mark.usefixtures('configure',
 
 
 def test_apply_networking(switch, nic1, nic2, network):
+    from haas.ext.obm.mock import MockObm
     # Create a port on the switch and connect it to the nic
     port = model.Port(label=INTERFACE1, switch=switch)
     nic1.port = port
@@ -109,9 +111,6 @@ def test_apply_networking(switch, nic1, nic2, network):
     db.session.add(action_native1)
     db.session.add(action_native2)
     db.session.commit()
-
-    current_count = db.session.query(model.NetworkingAction).count()
-    last_count = current_count
 
     deferred.apply_networking()
 
