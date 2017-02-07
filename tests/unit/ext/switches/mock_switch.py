@@ -14,13 +14,10 @@
 
 import pytest
 
-
 from haas import api, config, deferred, model
 from haas.model import db
 from haas.test_common import config_testsuite, config_merge, \
                              fresh_database, fail_on_log_warnings
-
-from sqlalchemy import Column, Integer, ForeignKey, String
 
 fail_on_log_warnings = pytest.fixture(autouse=True)(fail_on_log_warnings)
 fresh_database = pytest.fixture(fresh_database)
@@ -112,10 +109,6 @@ def test_apply_networking(switch, nic1, nic2, network):
     db.session.commit()
 
     deferred.apply_networking()
-    tablenames = db.inspect(db.engine).get_table_names()
-    print tablenames
-    db.session.execute('DROP TABLE IF EXISTS "mock_test_switch"')
-    db.session.commit()
 
 
 class MockTestSwitch(model.Switch):
@@ -126,10 +119,10 @@ class MockTestSwitch(model.Switch):
         'polymorphic_identity': api_name,
     }
 
-    id = Column(Integer, ForeignKey('switch.id'), primary_key=True)
-    hostname = Column(String, nullable=False)
-    username = Column(String, nullable=False)
-    password = Column(String, nullable=False)
+    id = db.Column(db.Integer, db.ForeignKey('switch.id'), primary_key=True)
+    hostname = db.Column(db.String, nullable=False)
+    username = db.Column(db.String, nullable=False)
+    password = db.Column(db.String, nullable=False)
     last_count = None
 
     def session(self):
