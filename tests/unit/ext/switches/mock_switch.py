@@ -112,6 +112,10 @@ def test_apply_networking(switch, nic1, nic2, network):
     db.session.commit()
 
     deferred.apply_networking()
+    tablenames = db.inspect(db.engine).get_table_names()
+    print tablenames
+    db.session.execute('DROP TABLE IF EXISTS "mock_test_switch"')
+    db.session.commit()
 
 
 class MockTestSwitch(model.Switch):
