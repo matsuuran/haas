@@ -14,7 +14,7 @@
 
 import pytest
 
-from haas import api, config, deferred, model
+from haas import config, deferred, model
 from haas.model import db
 from haas.test_common import config_testsuite, config_merge, \
                              fresh_database, fail_on_log_warnings
@@ -33,6 +33,7 @@ def configure():
         'extensions': {
             'haas.ext.auth.null': None,
             'haas.ext.obm.mock': '',
+            'haas.ext.switches.test': '',
         },
     })
     config.load_extensions()
@@ -40,7 +41,8 @@ def configure():
 
 @pytest.fixture()
 def switch():
-    return MockTestSwitch(
+    from haas.ext.switches.test import TestSwitch
+    return TestSwitch(
         label='switch',
         hostname='http://example.com',
         username='admin',
@@ -106,37 +108,8 @@ def test_apply_networking(switch, nic1, nic2, network):
 
     db.session.add(action_native1)
     db.session.add(action_native2)
+    tablenames = db.inspect(db.engine).get_table_names()
+    print tablenames
     db.session.commit()
 
     deferred.apply_networking()
-
-
-class MockTestSwitch(model.Switch):
-
-    api_name = 'http://schema.massopencloud.org/haas/v0/switches/mock'
-
-    __mapper_args__ = {
-        'polymorphic_identity': api_name,
-    }
-
-    id = db.Column(db.Integer, db.ForeignKey('switch.id'), primary_key=True)
-    hostname = db.Column(db.String, nullable=False)
-    username = db.Column(db.String, nullable=False)
-    password = db.Column(db.String, nullable=False)
-    last_count = None
-
-    def session(self):
-        return self
-
-    def disconnect(self):
-        pass
-
-    def apply_networking(self, action):
-        current_count = db.session.query(model.NetworkingAction).count()
-
-        if self.last_count is None:
-            self.last_count = current_count
-        else:
-            assert current_count == self.last_count - 1, \
-              "network daemon did not commit previous change!"
-            self.last_count = current_count

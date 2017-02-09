@@ -12,3 +12,4 @@ dist
 /testsuite.cfg
 /site-layout.json
 /.cache
+.DS_STORE
