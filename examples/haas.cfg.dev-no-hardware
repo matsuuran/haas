@@ -25,7 +25,6 @@ dry_run=True
 
 [extensions]
 haas.ext.switches.mock =
-haas.ext.switches.test =
 haas.ext.obm.mock =
 
 haas.ext.network_allocators.null =
